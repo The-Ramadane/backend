@@ -1,18 +1,22 @@
 package ramadane.org.backendproject.auth;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import ramadane.org.backendproject.config.JwtService;
 import ramadane.org.backendproject.token.Token;
 import ramadane.org.backendproject.token.TokenRepo;
 import ramadane.org.backendproject.token.TokenType;
 import ramadane.org.backendproject.user.User;
 import ramadane.org.backendproject.user.UserRepository;
+
+import java.util.Optional;
 
 @Service
 public class AuthenticationService {
@@ -38,22 +42,31 @@ public class AuthenticationService {
     }
 
     public AuthenticationResponse register(RegisterRequest request) {
-        var user = User.builder()
-                .firstname(request.getFirstname())
-                .lastname(request.getLastname())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole())
-                .build();
-        var savedUser = repository.save(user);
-        var jwtToken = jwtService.generateToken(user);
-        var refreshToken = jwtService.generateRefreshToken(user);
-        saveUserToken(savedUser, jwtToken);
-        return AuthenticationResponse.builder()
-                .accessToken(jwtToken)
-                .refreshToken(refreshToken)
-                .build();
+    Optional<User> emailExist = repository.findByEmail(request.getEmail());
+
+    if (emailExist.isPresent()) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Cet email existe déjà");
     }
+
+    var user = User.builder()
+            .firstname(request.getFirstname())
+            .lastname(request.getLastname())
+            .email(request.getEmail())
+            .password(passwordEncoder.encode(request.getPassword()))
+            .role(request.getRole())
+            .build();
+
+    var savedUser = repository.save(user);
+    var jwtToken = jwtService.generateToken(savedUser);
+    var refreshToken = jwtService.generateRefreshToken(savedUser);
+    saveUserToken(savedUser, jwtToken);
+
+    return AuthenticationResponse.builder()
+            .accessToken(jwtToken)
+            .refreshToken(refreshToken)
+            .build();
+}
+
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         authenticationManager.authenticate(
@@ -63,7 +76,7 @@ public class AuthenticationService {
                 )
         );
         var user = repository.findByEmail(request.getEmail())
-                .orElseThrow();
+                .orElseThrow(()-> new RuntimeException("User not found"));
         var jwtToken = jwtService.generateToken(user);
         var refreshToken = jwtService.generateRefreshToken(user);
         revokeAllUserTokens(user);

@@ -9,8 +9,12 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -39,7 +43,16 @@ public class UserController {
             @RequestBody ChangePasswordRequest request,
             Principal connectedUser
     ) {
-        service.changePassword(request, connectedUser);
-        return ResponseEntity.ok().build();
+        try {
+             service.changePassword(request, connectedUser);
+             return ResponseEntity.ok("Mot de passe changé avec succès");
+        } catch (ResponseStatusException ex) {
+            Map<String, Object> errorDetails = new HashMap<>();
+            errorDetails.put("status", ex.getStatusCode().value());
+            errorDetails.put("error", ex.getReason());
+            errorDetails.put("timestamp", LocalDateTime.now());
+
+            return ResponseEntity.status(ex.getStatusCode()).body(errorDetails);
+        }
     }
 }

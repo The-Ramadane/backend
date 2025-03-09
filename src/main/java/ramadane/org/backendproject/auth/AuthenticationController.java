@@ -6,7 +6,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import ramadane.org.backendproject.user.User;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -19,6 +24,7 @@ public class AuthenticationController {
     public AuthenticationController(AuthenticationService service) {
         this.service = service;
     }
+
 
     @Operation(
             description = "Endpoint pour l'inscription d'un nouvel utilisateur",
@@ -35,11 +41,20 @@ public class AuthenticationController {
             }
     )
     @PostMapping("/register")
-    public ResponseEntity<AuthenticationResponse> register(
-            @RequestBody RegisterRequest request
-    ) {
-        return ResponseEntity.ok(service.register(request));
+    public ResponseEntity<Object> register(@RequestBody RegisterRequest request) {
+        try {
+            AuthenticationResponse auth = service.register(request);
+            return ResponseEntity.ok(auth);
+        } catch (ResponseStatusException ex) {
+            Map<String, Object> errorDetails = new HashMap<>();
+            errorDetails.put("status", ex.getStatusCode().value());
+            errorDetails.put("error", ex.getReason());
+            errorDetails.put("timestamp", LocalDateTime.now());
+
+            return ResponseEntity.status(ex.getStatusCode()).body(errorDetails);
+        }
     }
+
 
     @Operation(
             description = "Endpoint pour l'authentification d'un utilisateur",
